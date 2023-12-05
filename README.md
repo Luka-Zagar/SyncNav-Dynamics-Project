@@ -1,2 +1,2 @@
 # SyncNav-Dynamics-Project
-SyncNav Dynamics pioneers autonomous navigation tech, aiming to create a state-of-the-art vehicle/system navigating human-built landscapes seamlessly. It envisions a future where intelligent systems navigate urban challenges with precision.
+SyncNav Dynamics is an ambitious project at the forefront of autonomous navigation technology, with a primary objective to design a cutting-edge vehicle/system capable of seamlessly navigating through the intricacies of the human-built world. The project envisions a future where intelligent systems can efficiently find paths, autonomously resolve challenges, and navigate dynamic urban environments with precision.
