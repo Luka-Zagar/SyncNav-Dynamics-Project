@@ -196,4 +196,4 @@ stevilo vseh frejmov:  1623
 stevilo najdenih levih robov :  1043
 stevilo najdenih desih robov :  1189
 
-num3:(threshoold == 45)
+num3:(threshoold == 45)?'''
