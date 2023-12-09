@@ -1,148 +1,160 @@
-####   tole je je snip code k se je uporablala v enm mojm prejsnm projectu in je nek dober base za naprej delat karkol povezanga s rpi4 in intel realsense kamero 
-if True: #Setup
-    import pyrealsense2.pyrealsense2 as rs
-    import numpy as np
-    import cv2
-    import time
-    import RPi.GPIO as IO
-    IO.setwarnings(False)
-    IO.setmode(IO.BOARD)
-    pipeline = rs.pipeline()
-    config = rs.config()
+import pyrealsense2 as rs
+import numpy as np
+import cv2
+import time
 
-    def IndicateBoot (runner):
-        while runner <= 5:
-            IO.setup(PinChoice(runner), IO.OUT)
-            runner+=1
-        runner = 1
-        while runner <= 4:
-            IO.output(PinChoice(runner), 1)
-            time.sleep(0.2)
-            IO.output(PinChoice(runner), 0)
-            runner += 1
-        while runner >= 1:
-            IO.output(PinChoice(runner), 1)
-            time.sleep(0.2)
-            IO.output(PinChoice(runner), 0)
-            runner -= 1
-        runner = 1
+print ("\n\nVISUS software rev2 2021...........See with me V3\n\nSoftware in development by Nik Stanojevic and Val Vidmar\nPress 'x' to exit program")
 
-    def PinChoice (a):  ####izbereš kter motor LL=1 LE=2 NA=3 DE=4 DD=5
-        a = a + a -1
-        return 28+a
+pipeline = rs.pipeline()
+config = rs.config()
+States =  [0,0,0,0,0,0]
 
-    def Colour(b):
-        if b == 2:
-            CLR = [0,0,255]
-        elif b == 1:
-            CLR = [255,0,0]
-        else:
-            CLR = [0,0,0]
-        return CLR
+LL=1#navezuje se na counter "o", 
+LE=2
+NA=3
+DE=4
+DD=5
 
-    def FindZoneOfX (x):
-        Zones = [1, 170, 340, 508, 678, 848]
-        XFinder = 1
-        while XFinder <=5:
-            if x <=Zones[XFinder]:
-                XisINzone = XFinder
-                XFinder = 69
-            XFinder +=1
-        return XisINzone
-        
+thr1=1
+thr2=1.6
 
-    IndicateBoot (1)
+#..................................
+preset=1        #1,2,3
+targetFPS=90     #6,15,30,60,90 
+#..................................
 
-    red = 2
+if preset==1:
+    width=848
+    height=480
 
-    blue = 1
+elif preset==2:
+    width=640
+    height=360
 
-    black = 0
-
-    o = 1
-
-    PotrebnePikice = 7
+else:
+    width=480
+    height=270
 
 
-    BlinkingCnt = 0
-    engages= [False,False,False,False,False,False]
-    Colours = [0,0,0,0,0,0]
+OneWidth=int(width/5)
 
-    PodTemRdeče = 1.1
-    PodTemModru = 2.2
+config.enable_stream(rs.stream.depth, width, height, rs.format.z16, targetFPS)
+pipeline.start(config)
+Zones=[1,OneWidth,(OneWidth*2),(OneWidth*3),(OneWidth*4),width]
 
-    Zones = [0, 170, 340, 508, 678, 848]
+startTime=0
+newTime=0
+timec=0
+totalFPS=0
+frameNum=0
 
-    config.enable_stream(rs.stream.depth, 848, 480, rs.format.z16, 30)
-    pipeline.start(config)
 
-    IndicateBoot (69)
+while True:
 
-while True: #Workhorse program
-    CntRed = [0, 0, 0, 0, 0, 0]
-    CntBlue = [0, 0, 0, 0, 0, 0]
-    PikcaBarva = [0,0,0]
-    x = 847
-    y = 479
+    startTime=time.time()
 
-    frames = pipeline.wait_for_frames()
-    depth_frame = frames.get_depth_frame()
-    depth_image = np.asanyarray(depth_frame.get_data())
-    depth_colormap1 = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03),cv2.COLORMAP_INFERNO)  # DOBRE IZBIRE SO E:HSV, INFERNO, BONE, TURBO
-  
-    while y > 12 and x > 16:  #####UVRSTI X V CONO IN PREVERI NJEGOVO ODDALJENOST->VEČAJ COUNTERJE
-        Zone = FindZoneOfX(x)
-        Distance = depth_frame.get_distance(x, y)
-        if Distance == 0:
-            Distance = 69
-        PikcaBarva = [0,0,0]
-        if Distance <= PodTemRdeče:
-            CntRed[Zone] += 1
-            PikcaBarva = [0,0,255]
-        elif Distance <= PodTemModru:
-            CntBlue[Zone] += 1
-            PikcaBarva = [255 - BlinkingCnt, 0, 0]
+    shortDistance=[0,0,0,0,0]
+    mediumDistance=[0,0,0,0,0]
+    longDistance=[0,0,0,0,0]
 
-        
-        pixelsize = 8
-        cv2.rectangle(depth_colormap1, (x - pixelsize, y - pixelsize), (x + pixelsize, y + pixelsize), PikcaBarva, -1)
-        
-        x -= 16    #######################################################################SPREMENI NAZAJ NA 16!!!!!!
-        if x <= 33:
-            x = 847
-            y -= 12  ##############################12!!!!!!!!!!!!!!!!!!!!!
-
-    while o <= 5: ##### ALI JE DOVOLJ PIKIC DA NAŠTIMAMO STATE????
-        engages[o] = True
-
-        if CntRed[o] > PotrebnePikice:
-            Colours[o] = red
-            
-        elif CntBlue[o] > PotrebnePikice:
-            Colours[o] = blue
-
-        else:
-            Colours[o] = black
-            engages[o] = False
-        cv2.rectangle(depth_colormap1, ((Zones[o - 1]), 220), (Zones[o], 260), Colour(Colours[o]), 5)         
-        o += 1
-        
+    MinDist = [100,100,100,100,100,100]
+    CntARR1 = [0,0,0,0,0,0]
+    CntARR2 = [0,0,0,0,0,0]
+    States =  [0,0,0,0,0,0]
+    minLenght=100
+    x=31 #number of pixels skiped in x axis
+    y=23 #number of pixels skiped in y axis
     o=1
+    try:
+        frames = pipeline.wait_for_frames()
+        depth_frame = frames.get_depth_frame()
+        depth_image = np.asanyarray(depth_frame.get_data())
+        depth_colormap1 = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_INFERNO)#DOBRE IZBIRE SO Å E:HSV, INFERNO, BONE, TURBO
 
-
-    while o<= 5: ######## DEJANSKO PRIŽIGANJE MOTORJEV
+        while y < height and x < width:
+            if y>300:
+                thr2=1.1
+            else:
+                thr2=1.6
         
-        if Colours[o] == blue:
-            BlinkingCnt+=1
-            if BlinkingCnt <15:
-                IO.output(PinChoice(o),0)
-            elif BlinkingCnt > 15:
-                IO.output(PinChoice(o), 1)
-            if BlinkingCnt > 25:
-                BlinkingCnt=0
-        else:
-            IO.output(PinChoice(o),engages[o])
-        o+=1
-    o=1
-    cv2.imshow('RealSense1', depth_colormap1)
-    cv2.waitKey(1)
+            while True:
+                if x < (OneWidth * o):
+                    Zones[0] = o
+                    if CntARR1[o] > 10:
+                        if Zones[0] != 5:
+                            x += OneWidth
+                            Zones[0] += 1
+                    break
+                o += 1
+            o = 1
+            dist_to_center = depth_frame.get_distance(x,y)
+            if dist_to_center == 0:
+                dist_to_center=69
+
+            if dist_to_center < minLenght:
+                minLenght=dist_to_center
+            if x<=(Zones[0]*OneWidth):
+                if MinDist[Zones[0]]>dist_to_center:
+                    MinDist[Zones[0]]=dist_to_center
+                if dist_to_center <= thr1:
+                    CntARR1[Zones[0]] += 1
+                if dist_to_center > thr1 and dist_to_center <= thr2:
+                    CntARR2[Zones[0]] += 1
+            Zones[0] = 1
+            if dist_to_center <= thr1:
+                cv2.rectangle(depth_colormap1, (x - 2, y - 2), (x + 2, y + 2), (0, 0, 255), 2)
+            elif dist_to_center > thr1 and dist_to_center <= thr2:
+                cv2.rectangle(depth_colormap1, (x - 2, y - 2), (x + 2, y + 2), (255, 0, 0), 2)
+            else:
+                cv2.rectangle(depth_colormap1, (x - 2, y - 2), (x + 2, y + 2), (0, 0, 0), 2)
+
+            x += 32
+            if x >= width:
+                x = 31
+                y += 24
+        Zones = [1, int(OneWidth), int(OneWidth * 2), int(OneWidth * 3), int(OneWidth * 4), int(width)]
+
+        while o <= 5:
+            if CntARR1[o]>10:
+                States[o] = 1
+                shortDistance[o-1]=1
+                cv2.rectangle(depth_colormap1, ((Zones[o-1]), 220), (Zones[o], 260), (0, 0, 255), 5)
+            elif CntARR2[o]>10:
+                States[o] = 1.1
+                mediumDistance[o-1]=1
+                cv2.rectangle(depth_colormap1, ((Zones[o-1]), 220), (Zones[o], 260), (255, 0, 0), 5)
+            else:
+                longDistance[o-1]=1
+                cv2.rectangle(depth_colormap1, ((Zones[o-1]), 220), (Zones[o], 260), (0, 0, 0), 5)
+                States[o] = 0
+            o+=1
+        
+        #imageBig = cv2.resize(depth_colormap1, (0, 0), fx=1.7, fy=1.7)
+        #cv2.imshow('RealSense1', imageBig)
+        if cv2.waitKey(25) & 0xFF == ord('x'):
+            print("FPS: ", round(totalFPS/frameNum,2),"\nSequence closed successfully!" )
+            break
+        cv2.imshow('RealSense1', depth_colormap1)
+        cv2.waitKey(1)
+        newTime=time.time()
+        timec=newTime-startTime
+        fps=1/timec
+        frameNum+=1
+        totalFPS+=fps
+        if targetFPS>(fps+1):
+            print("Low FPS warning!!!")
+        '''print("------------------------")
+        print("Long:   ",longDistance)
+        print("Medium: ",mediumDistance)
+        print("Short:  ",shortDistance)'''
+        print("FPS: ",round(fps,2))
+
+    except:
+        print("Camera not connected!!!")
+        try:
+            pipeline = rs.pipeline()
+            config = rs.config()
+            config.enable_stream(rs.stream.depth, width, height, rs.format.z16, targetFPS)
+            pipeline.start(config)
+        except:
+            print("Detecting for camera...")
